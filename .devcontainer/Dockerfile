@@ -6,6 +6,8 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     cmake \
     libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libgl1-mesa-dev \
+    mesa-utils x11-apps \
+    iputils-ping \
     && rm -rf /var/lib/apt/lists/*
 
 RUN apt-get update && apt-get install -y \

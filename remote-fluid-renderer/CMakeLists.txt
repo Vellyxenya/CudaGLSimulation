@@ -1,8 +1,11 @@
 # CMake project for remote_sim_gl
 cmake_minimum_required(VERSION 3.10)
-project(RemoteSimGL)
+project(RemoteSimGL LANGUAGES C CXX CUDA)
 
 set(CMAKE_CXX_STANDARD 17)
+
+cmake_policy(SET CMP0104 NEW)
+set(CMAKE_CUDA_ARCHITECTURES 89) # 89 for Ada Lovelace architecture GPU
 
 include(FetchContent)
 
@@ -16,23 +19,34 @@ FetchContent_MakeAvailable(glfw)
 
 find_package(CUDAToolkit REQUIRED)
 
+# Define source files
 set(GLAD_SRC deps/glad/src/gl.c)
+file(GLOB SRC_FILES src/main.cpp src/gl/*.cpp)
+file(GLOB CU_FILES src/cuda/*.cu)
 
-# Add source files
-file(GLOB SRC_FILES src/*.cpp)
-
-# Create the executable
-add_executable(remote_sim_gl ${SRC_FILES})
+# Create the executable with source files
+add_executable(sim ${SRC_FILES} ${CU_FILES} ${GLAD_SRC})
 
 # Include directories
-target_include_directories(remote_sim_gl PRIVATE include 
-deps/glm deps/nvcodec/Interface deps/glad/include) #  deps/libwebrtc)
+target_include_directories(sim PRIVATE include 
+  include
+  deps/glm
+  deps/nvcodec/Interface
+  deps/glad/include) #  deps/libwebrtc)
 
 # Link directories
-target_link_directories(remote_sim_gl PRIVATE deps/nvcodec/Lib/linux/stubs/x86_64) # deps/libwebrtc/out/Default/obj
+target_link_directories(sim PRIVATE
+  deps/nvcodec/Lib/linux/stubs/x86_64
+) # deps/libwebrtc/out/Default/obj
 
 # Link libraries
-target_link_libraries(remote_sim_gl PRIVATE nvcuvid nvidia-encode glfw CUDA::cuda_driver CUDA::cudart)
+target_link_libraries(sim PRIVATE
+  nvcuvid
+  nvidia-encode
+  glfw
+  CUDA::cuda_driver
+  CUDA::cudart
+)
 
-# Add GLAD source
-target_sources(remote_sim_gl PRIVATE ${GLAD_SRC})
+# Enable separate compilation for CUDA files
+set_target_properties(sim PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
