@@ -46,11 +46,15 @@ int main() {
     GLFWwindow* window = initWindow();
     if (!window) return -1;
 
+    cudaSetDevice(0);
+
     // Create the renderer (sets up PBO, texture, CUDA interop, VAO, shaders)
     gl::Renderer renderer(WIDTH, HEIGHT);
 
     // Main loop
     while (!glfwWindowShouldClose(window)) {
+        std::cout << "Expected size: " << WIDTH * HEIGHT * sizeof(uchar4) << " bytes" << std::endl;
+
         // 1) Map the CUDA-accessible PBO and get the device pointer
         uchar4* devPtr = renderer.mapCudaResource();
 

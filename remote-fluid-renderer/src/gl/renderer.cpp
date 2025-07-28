@@ -21,11 +21,15 @@ void Renderer::initGLResources() {
     // Create PBO
     glGenBuffers(1, &pbo);
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo);
-    glBufferData(GL_PIXEL_UNPACK_BUFFER, width * height * 4, nullptr, GL_DYNAMIC_DRAW);
+    glBufferData(GL_PIXEL_UNPACK_BUFFER, width * height * 4 * sizeof(uint8_t), nullptr, GL_DYNAMIC_DRAW);
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 
     // Register with CUDA
-    cudaGraphicsGLRegisterBuffer(&cudaPBO, pbo, cudaGraphicsMapFlagsWriteDiscard);
+    cudaError_t err = cudaGraphicsGLRegisterBuffer(&cudaPBO, pbo, cudaGraphicsMapFlagsWriteDiscard);
+    if (err != cudaSuccess) {
+        std::cerr << "cudaGraphicsGLRegisterBuffer failed: "
+                << cudaGetErrorString(err) << std::endl;
+    }
 
     // Create texture
     glGenTextures(1, &tex);
@@ -52,6 +56,7 @@ uchar4* Renderer::mapCudaResource() {
     uchar4* dptr;
     size_t size;
     cudaGraphicsResourceGetMappedPointer((void**)&dptr, &size, cudaPBO);
+    std::cout << "Mapped CUDA buffer size: " << size << " bytes" << std::endl;
     return dptr;
 }
 
