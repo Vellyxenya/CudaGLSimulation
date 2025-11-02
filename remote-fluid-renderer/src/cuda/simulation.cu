@@ -1,3 +1,9 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <glad/gl.h>
+#include <cuda_runtime.h>
+#include <cuda_gl_interop.h>
+
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 #include "cuda/cuda_utils.cuh"
@@ -7,12 +13,16 @@
 constexpr int WIDTH = 800;
 constexpr int HEIGHT = 600;
 
+__device__ __forceinline__ float saturatef(float x) {
+    return fminf(fmaxf(x, 0.0f), 1.0f);
+}
+
 __device__ uchar4 floatToUchar4(float4 f) {
     return make_uchar4(
-        __saturatef(f.x) * 255.0f,
-        __saturatef(f.y) * 255.0f,
-        __saturatef(f.z) * 255.0f,
-        __saturatef(f.w) * 255.0f
+        saturatef(f.x) * 255.0f,
+        saturatef(f.y) * 255.0f,
+        saturatef(f.z) * 255.0f,
+        saturatef(f.w) * 255.0f
     );
 }
 

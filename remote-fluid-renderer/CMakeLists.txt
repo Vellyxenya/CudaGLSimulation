@@ -41,11 +41,12 @@ target_link_directories(sim PRIVATE
 
 # Link libraries
 target_link_libraries(sim PRIVATE
-  nvcuvid
-  nvidia-encode
-  glfw
   CUDA::cuda_driver
   CUDA::cudart
+  glfw
+  opengl32
+  gdi32
+  user32
 )
 
 # Enable separate compilation for CUDA files

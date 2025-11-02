@@ -1,3 +1,9 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <glad/gl.h>
+#include <cuda_runtime.h>
+#include <cuda_gl_interop.h>
+
 #include "cuda/cuda_utils.cuh"
 #include <iostream>
 

@@ -1,9 +1,11 @@
 // gl/renderer.cpp
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>       // must come first
 
 #include "gl/renderer.hpp"
 #include "gl/gl_utils.hpp"
 
-#include <cuda_gl_interop.h>
+// #include <cuda_gl_interop.h>
 #include <iostream>
 
 namespace gl {

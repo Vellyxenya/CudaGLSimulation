@@ -1,4 +1,11 @@
 // src/main.cpp
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+
+extern "C" {
+    __declspec(dllexport) DWORD NvOptimusEnablement = 0x00000001; // NVIDIA GPU
+    __declspec(dllexport) DWORD AmdPowerXpressRequestHighPerformance = 0x00000001; // AMD GPU
+}
 
 #include <iostream>
 #include <glad/gl.h>
@@ -50,6 +57,9 @@ int main() {
 
     // Create the renderer (sets up PBO, texture, CUDA interop, VAO, shaders)
     gl::Renderer renderer(WIDTH, HEIGHT);
+
+    const GLubyte* r = glGetString(GL_RENDERER);
+    std::cout << "Renderer: " << r << std::endl;
 
     // Main loop
     while (!glfwWindowShouldClose(window)) {

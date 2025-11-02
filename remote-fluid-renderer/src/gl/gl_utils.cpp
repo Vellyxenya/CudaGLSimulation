@@ -1,5 +1,6 @@
 // gl/gl_utils.cpp
-
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>       // must come first
 #include "gl/gl_utils.hpp"
 
 #include <fstream>
