@@ -58,10 +58,6 @@ int main() {
 
     cudaSetDevice(0);
 
-    const float dt = 0.6f;
-    const float diffusion = 0.2f;
-    const float sourceHeat = 5.0f;
-
     // Create the renderer (sets up PBO, texture, CUDA interop, VAO, shaders)
     gl::Renderer renderer(WIDTH, HEIGHT);
 
@@ -72,9 +68,13 @@ int main() {
     bool useHeat = false;
 
     if (useHeat) {
+        const float dt = 0.6f;
+        const float diffusion = 0.2f;
+        const float sourceHeat = 5.0f;
         simulation = new HeatSimulation(WIDTH, HEIGHT, dt, diffusion, sourceHeat);
     }
     else {
+        float dt = 0.009f;
         simulation = new FluidSimulation(WIDTH, HEIGHT, dt);
     }
 

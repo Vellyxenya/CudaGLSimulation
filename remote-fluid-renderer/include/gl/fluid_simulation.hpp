@@ -18,8 +18,16 @@ private:
     int m_height;
     float m_dt;
     float m_diffusion;
-    float m_sourceHeat;
 
+    // Density grids
     float* m_devCurrent;
     float* m_devNext;
+
+    // Velocity grids
+    float* m_velU;
+    float* m_velV;
+    float* m_velNextU;
+    float* m_velNextV;
+
+    float m_sourceDensity;
 };
