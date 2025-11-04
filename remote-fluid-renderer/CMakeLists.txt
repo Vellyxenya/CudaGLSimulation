@@ -20,12 +20,13 @@ FetchContent_MakeAvailable(glfw)
 find_package(CUDAToolkit REQUIRED)
 
 # Define source files
-set(GLAD_SRC deps/glad/src/gl.c)
 file(GLOB SRC_FILES src/main.cpp src/gl/*.cpp)
 file(GLOB CU_FILES src/cuda/*.cu)
+file(GLOB HEADER_FILES include/**/*.h include/**/*.hpp)
+set(GLAD_SRC deps/glad/src/gl.c)
 
 # Create the executable with source files
-add_executable(sim ${SRC_FILES} ${CU_FILES} ${GLAD_SRC})
+add_executable(sim ${SRC_FILES} ${CU_FILES} ${HEADER_FILES} ${GLAD_SRC})
 
 # Include directories
 target_include_directories(sim PRIVATE include 

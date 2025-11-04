@@ -63,8 +63,6 @@ int main() {
 
     // Main loop
     while (!glfwWindowShouldClose(window)) {
-        std::cout << "Expected size: " << WIDTH * HEIGHT * sizeof(uchar4) << " bytes" << std::endl;
-
         // 1) Map the CUDA-accessible PBO and get the device pointer
         uchar4* devPtr = renderer.mapCudaResource();
 

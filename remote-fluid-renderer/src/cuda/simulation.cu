@@ -39,7 +39,7 @@ __global__ void updateBufferKernel(uchar4* buffer, float time) {
     float fy = (float)y / HEIGHT;
 
     float4 color = make_float4(fx, fy, 0.5f + 0.5f * sinf(time), 1.0f); // RGBA
-    buffer[idx] = make_uchar4(255, 0, 255, 255); // floatToUchar4(color);
+    buffer[idx] = floatToUchar4(color);
 }
 
 // Public launcher

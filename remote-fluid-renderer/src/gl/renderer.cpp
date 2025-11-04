@@ -58,7 +58,7 @@ uchar4* Renderer::mapCudaResource() {
     uchar4* dptr;
     size_t size;
     cudaGraphicsResourceGetMappedPointer((void**)&dptr, &size, cudaPBO);
-    std::cout << "Mapped CUDA buffer size: " << size << " bytes" << std::endl;
+    // std::cout << "Mapped CUDA buffer size: " << size << " bytes" << std::endl;
     return dptr;
 }
 

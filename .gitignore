@@ -41,3 +41,7 @@
 *.dwo
 
 remote-fluid-renderer/build/
+
+.vs/
+
+**/out/

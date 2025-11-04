@@ -10,7 +10,7 @@ public:
     Renderer(int width, int height);
     ~Renderer();
 
-    void draw();                    // Renders the texture to screen
+    void draw();                   // Renders the texture to screen
     void cleanup();                // Frees GL and CUDA resources
 
     uchar4* mapCudaResource();     // Maps PBO for CUDA
@@ -25,7 +25,7 @@ private:
     GLuint tex;
     cudaGraphicsResource* cudaPBO;
 
-     GLuint vao, vbo;
+    GLuint vao, vbo;
 };
 
 }  // namespace gl
