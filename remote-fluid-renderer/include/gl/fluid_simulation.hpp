@@ -1,11 +1,11 @@
-// sim/heat_simulation.hpp
+// sim/fluid_simulation.hpp
 #pragma once
 #include "simulation.hpp"
 
-class HeatSimulation : public Simulation {
+class FluidSimulation : public Simulation {
 public:
-    HeatSimulation(int width, int height, float dt, float diffusion, float sourceHeat);
-    ~HeatSimulation();
+    FluidSimulation(int width, int height, float dt);
+    ~FluidSimulation();
 
     // Set initial condition (optional)
     void setInitialCondition(const float* hostData = nullptr);

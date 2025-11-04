@@ -9,19 +9,6 @@
 #include "gl/heat_simulation.hpp"
 #include <iostream>
 
-__device__ __forceinline__ float saturatef(float x) {
-    return fminf(fmaxf(x, 0.0f), 1.0f);
-}
-
-__device__ uchar4 floatToUchar4(float4 f) {
-    return make_uchar4(
-        saturatef(f.x) * 255.0f,
-        saturatef(f.y) * 255.0f,
-        saturatef(f.z) * 255.0f,
-        saturatef(f.w) * 255.0f
-    );
-}
-
 __device__ __forceinline__ float laplacian(const float* grid, int x, int y, int width, int height) {
     float center = grid[y * width + x];
     float sum = 0.0f;
@@ -86,7 +73,7 @@ void HeatSimulation::setInitialCondition(const float* hostData) {
         cudaMemset(m_devCurrent, 0, size);
 }
 
-void HeatSimulation::step(uchar4* outputBuffer) {
+void HeatSimulation::step(uchar4* pbo) {
     dim3 block(16, 16);
     dim3 grid((m_width + block.x - 1) / block.x, (m_height + block.y - 1) / block.y);
 
@@ -98,7 +85,7 @@ void HeatSimulation::step(uchar4* outputBuffer) {
         std::cerr << "CUDA post-sync error: " << cudaGetErrorString(err) << std::endl;
     }
 
-    heatToColorKernel<<<grid, block>>>(m_devNext, outputBuffer, m_width, m_height);
+    heatToColorKernel<<<grid, block>>>(m_devNext, pbo, m_width, m_height);
     cudaDeviceSynchronize();
 
     err = cudaGetLastError();

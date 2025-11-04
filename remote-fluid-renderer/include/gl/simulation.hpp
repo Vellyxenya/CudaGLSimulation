@@ -6,12 +6,6 @@ class Simulation {
 public:
     virtual ~Simulation() = default;
 
-    // Allocate device memory / initialize simulation
-    virtual void init(int width, int height) = 0;
-
-    // Perform one simulation step and write to PBO
-    virtual void step(void* pbo, float dt) = 0;
-
-    // Cleanup device memory
-    virtual void cleanup() = 0;
+    // Main function to update the simulation and write to PBO
+    virtual void step(uchar4* pbo) = 0;
 };

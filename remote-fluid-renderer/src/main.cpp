@@ -15,6 +15,7 @@ extern "C" {
 
 #include "gl/renderer.hpp"
 #include "gl/heat_simulation.hpp"
+#include "gl/fluid_simulation.hpp"
 
 const int WIDTH  = 800;
 const int HEIGHT = 600;
@@ -67,7 +68,15 @@ int main() {
     const GLubyte* r = glGetString(GL_RENDERER);
     std::cout << "Renderer: " << r << std::endl;
 
-    HeatSimulation heatSimulation(WIDTH, HEIGHT, dt, diffusion, sourceHeat);
+    Simulation* simulation = nullptr;
+    bool useHeat = false;
+
+    if (useHeat) {
+        simulation = new HeatSimulation(WIDTH, HEIGHT, dt, diffusion, sourceHeat);
+    }
+    else {
+        simulation = new FluidSimulation(WIDTH, HEIGHT, dt);
+    }
 
     int frames = 0;
     auto lastTime = std::chrono::high_resolution_clock::now();
@@ -88,7 +97,7 @@ int main() {
         uchar4* devPtr = renderer.mapCudaResource();
 
         // 2) Launch the heat simulation kernel
-        heatSimulation.step(devPtr);
+        simulation->step(devPtr);
 
         // 3) Unmap so OpenGL can use the updated PBO
         renderer.unmapCudaResource();
