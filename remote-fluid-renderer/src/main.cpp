@@ -7,7 +7,9 @@ extern "C" {
     __declspec(dllexport) DWORD AmdPowerXpressRequestHighPerformance = 0x00000001; // AMD GPU
 }
 
+#include <chrono>
 #include <iostream>
+#include <string>
 #include <glad/gl.h>
 #include <GLFW/glfw3.h>
 
@@ -84,8 +86,21 @@ int main() {
     const GLubyte* r = glGetString(GL_RENDERER);
     std::cout << "Renderer: " << r << std::endl;
 
+    int frames = 0;
+    auto lastTime = std::chrono::high_resolution_clock::now();
+
     // Main loop
     while (!glfwWindowShouldClose(window)) {
+        auto currentTime = std::chrono::high_resolution_clock::now();
+        frames++;
+        float delta = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - lastTime).count();
+        if (delta >= 1.0f) {
+            std::string title = "CUDA HeatSim - FPS: " + std::to_string(frames);
+            glfwSetWindowTitle(window, title.c_str());
+            frames = 0;
+            lastTime = currentTime;
+        }
+
         // 1) Map the CUDA-accessible PBO and get the device pointer
         uchar4* devPtr = renderer.mapCudaResource();
 
