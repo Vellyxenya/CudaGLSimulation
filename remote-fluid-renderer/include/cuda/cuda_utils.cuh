@@ -13,7 +13,7 @@ void cudaUnregisterBuffer(struct cudaGraphicsResource* resource);
 extern "C" {
 #endif
 
-void launchSimulationKernel(void* devPtr, size_t size, float time);
+void launchHeatSimulation(float* devCurrent, float* devNext, void* pbo, int width, int height, float dt, float diffusion, float sourceValue);
 
 #ifdef __cplusplus
 }
