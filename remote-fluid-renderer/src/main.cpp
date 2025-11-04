@@ -14,7 +14,7 @@ extern "C" {
 #include <GLFW/glfw3.h>
 
 #include "gl/renderer.hpp"
-#include "cuda/cuda_utils.cuh"
+#include "gl/heat_simulation.hpp"
 
 const int WIDTH  = 800;
 const int HEIGHT = 600;
@@ -57,26 +57,7 @@ int main() {
 
     cudaSetDevice(0);
 
-    // Allocate two float buffers: current and next state
-    float* devCurrent;
-    float* devNext;
-    size_t gridSize = WIDTH * HEIGHT * sizeof(float);
-
-    cudaMalloc(&devCurrent, gridSize);
-    cudaMalloc(&devNext, gridSize);
-
-    // Set initial conditions (host buffer)
-    float* h_init = new float[WIDTH * HEIGHT](); // zero-initialized
-
-    // Example: central hot spot
-    //int cx = WIDTH / 2;
-    //int cy = HEIGHT / 2;
-    //h_init[cy * WIDTH + cx] = 25.0f;  // max heat in center
-
-    cudaMemcpy(devCurrent, h_init, gridSize, cudaMemcpyHostToDevice);
-    delete[] h_init;
-
-    const float dt = 0.1f;
+    const float dt = 0.6f;
     const float diffusion = 0.2f;
     const float sourceHeat = 5.0f;
 
@@ -85,6 +66,8 @@ int main() {
 
     const GLubyte* r = glGetString(GL_RENDERER);
     std::cout << "Renderer: " << r << std::endl;
+
+    HeatSimulation heatSimulation(WIDTH, HEIGHT, dt, diffusion, sourceHeat);
 
     int frames = 0;
     auto lastTime = std::chrono::high_resolution_clock::now();
@@ -105,10 +88,7 @@ int main() {
         uchar4* devPtr = renderer.mapCudaResource();
 
         // 2) Launch the heat simulation kernel
-        launchHeatSimulation(devCurrent, devNext, devPtr, WIDTH, HEIGHT, dt, diffusion, sourceHeat);
-
-        // Swap buffers for next iteration
-        std::swap(devCurrent, devNext);
+        heatSimulation.step(devPtr);
 
         // 3) Unmap so OpenGL can use the updated PBO
         renderer.unmapCudaResource();
@@ -124,10 +104,6 @@ int main() {
 
     // Cleanup
     renderer.cleanup();
-
-    cudaFree(devCurrent);
-    cudaFree(devNext);
-
     glfwDestroyWindow(window);
     glfwTerminate();
     return 0;

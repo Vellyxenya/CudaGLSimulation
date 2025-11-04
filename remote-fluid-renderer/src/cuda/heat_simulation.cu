@@ -4,9 +4,9 @@
 #include <cuda_runtime.h>
 #include <cuda_gl_interop.h>
 
-#include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 #include "cuda/cuda_utils.cuh"
+#include "gl/heat_simulation.hpp"
 #include <iostream>
 
 __device__ __forceinline__ float saturatef(float x) {
@@ -61,13 +61,36 @@ __global__ void heatToColorKernel(const float* heat, uchar4* buffer, int width, 
     buffer[idx] = floatToUchar4(heatToColor(heat[idx]));
 }
 
-void launchHeatSimulation(float* devCurrent, float* devNext, void* pbo, int width, int height, float dt, float diffusion, float sourceValue) {
-    dim3 block(16, 16);
-    dim3 grid((width + block.x - 1) / block.x,
-        (height + block.y - 1) / block.y);
+HeatSimulation::HeatSimulation(int width, int height, float dt, float diffusion, float sourceHeat)
+    : m_width(width), m_height(height), m_dt(dt), m_diffusion(diffusion), m_sourceHeat(sourceHeat)
+{
+    size_t size = width * height * sizeof(float);
+    cudaMalloc(&m_devCurrent, size);
+    cudaMalloc(&m_devNext, size);
 
-    // Step simulation
-    heatStepKernel<<<grid, block>>>(devCurrent, devNext, width, height, dt, diffusion, sourceValue);
+    // Zero init
+    cudaMemset(m_devCurrent, 0, size);
+    cudaMemset(m_devNext, 0, size);
+}
+
+HeatSimulation::~HeatSimulation() {
+    cudaFree(m_devCurrent);
+    cudaFree(m_devNext);
+}
+
+void HeatSimulation::setInitialCondition(const float* hostData) {
+    size_t size = m_width * m_height * sizeof(float);
+    if (hostData)
+        cudaMemcpy(m_devCurrent, hostData, size, cudaMemcpyHostToDevice);
+    else
+        cudaMemset(m_devCurrent, 0, size);
+}
+
+void HeatSimulation::step(uchar4* outputBuffer) {
+    dim3 block(16, 16);
+    dim3 grid((m_width + block.x - 1) / block.x, (m_height + block.y - 1) / block.y);
+
+    heatStepKernel<<<grid, block>>>(m_devCurrent, m_devNext, m_width, m_height, m_dt, m_diffusion, m_sourceHeat);
     cudaDeviceSynchronize();
 
     cudaError_t err = cudaGetLastError();
@@ -75,13 +98,13 @@ void launchHeatSimulation(float* devCurrent, float* devNext, void* pbo, int widt
         std::cerr << "CUDA post-sync error: " << cudaGetErrorString(err) << std::endl;
     }
 
-    // Map to color buffer
-    uchar4* buffer = reinterpret_cast<uchar4*>(pbo);
-    heatToColorKernel<<<grid, block>>>(devNext, buffer, width, height);
+    heatToColorKernel<<<grid, block>>>(m_devNext, outputBuffer, m_width, m_height);
     cudaDeviceSynchronize();
 
     err = cudaGetLastError();
     if (err != cudaSuccess) {
         std::cerr << "CUDA post-sync error: " << cudaGetErrorString(err) << std::endl;
     }
+
+    std::swap(m_devCurrent, m_devNext);
 }

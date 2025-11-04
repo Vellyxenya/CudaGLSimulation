@@ -22,7 +22,7 @@ find_package(CUDAToolkit REQUIRED)
 # Define source files
 file(GLOB SRC_FILES src/main.cpp src/gl/*.cpp)
 file(GLOB CU_FILES src/cuda/*.cu)
-file(GLOB HEADER_FILES include/**/*.h include/**/*.hpp)
+file(GLOB HEADER_FILES include/**/*.h include/**/*.hpp include/**/*.cuh)
 set(GLAD_SRC deps/glad/src/gl.c)
 
 # Create the executable with source files
