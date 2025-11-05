@@ -18,6 +18,8 @@ private:
     int m_height;
     float m_dt;
     float m_diffusion;
+    float m_viscosity;
+    float m_sourceDensity;
 
     // Density grids
     float* m_devCurrent;
@@ -29,5 +31,6 @@ private:
     float* m_velNextU;
     float* m_velNextV;
 
-    float m_sourceDensity;
+    float* m_pressure;
+    float* m_divergence;
 };
