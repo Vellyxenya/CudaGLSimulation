@@ -12,6 +12,7 @@ extern "C" {
 #include <string>
 #include <glad/gl.h>
 #include <GLFW/glfw3.h>
+#include <glm/glm.hpp>
 
 #include "gl/renderer.hpp"
 #include "gl/heat_simulation.hpp"
@@ -74,7 +75,7 @@ int main() {
         simulation = new HeatSimulation(WIDTH, HEIGHT, dt, diffusion, sourceHeat);
     }
     else {
-        float dt = 0.009f;
+        float dt = 0.09f;
         simulation = new FluidSimulation(WIDTH, HEIGHT, dt);
     }
 
@@ -95,6 +96,39 @@ int main() {
 
         // 1) Map the CUDA-accessible PBO and get the device pointer
         uchar4* devPtr = renderer.mapCudaResource();
+
+        // --- Mouse interaction (only if it's a FluidSimulation) ---
+        FluidSimulation* fluidSim = dynamic_cast<FluidSimulation*>(simulation);
+        if (fluidSim) {
+            static double prevX = 0.0, prevY = 0.0;
+            double mouseX, mouseY;
+            glfwGetCursorPos(window, &mouseX, &mouseY);
+
+            int leftDown = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT);
+            int rightDown = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT);
+
+            // Map window coords to simulation coords
+            int simX = static_cast<int>(mouseX / WIDTH * fluidSim->width());
+            int simY = static_cast<int>((HEIGHT - mouseY) / HEIGHT * fluidSim->height()); // flip Y
+
+            float2 mouseVel = make_float2(static_cast<float>(mouseX - prevX),
+                static_cast<float>(prevY - mouseY)); // note inverted Y
+            prevX = mouseX;
+            prevY = mouseY;
+
+            if (leftDown == GLFW_PRESS) {
+                float scale = 0.3f;
+                fluidSim->injectFromMouse(simX, simY,
+                    make_float2(mouseVel.x * scale, mouseVel.y * scale),
+                    true);
+            }
+            else if (rightDown == GLFW_PRESS) {
+                float scale = 0.3f;
+                fluidSim->injectFromMouse(simX, simY,
+                    make_float2(-mouseVel.x * scale, -mouseVel.y * scale),
+                    false);
+            }
+        }
 
         // 2) Launch the heat simulation kernel
         simulation->step(devPtr);

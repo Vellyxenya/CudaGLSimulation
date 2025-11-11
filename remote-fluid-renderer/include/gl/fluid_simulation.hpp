@@ -13,6 +13,11 @@ public:
     // Advance one step of simulation and write to a CUDA buffer (PBO)
     void step(uchar4* pbo) override;
 
+    int width() const { return m_width; }
+    int height() const { return m_height; }
+
+    void injectFromMouse(int x, int y, float2 force, bool addDensity);
+
 private:
     int m_width;
     int m_height;

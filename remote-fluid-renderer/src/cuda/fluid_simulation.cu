@@ -149,6 +149,39 @@ __global__ void advect_kernel(const float* d0, float* d, const float* u, const f
     d[id] = bilinear_sample(d0, px, py, width, height);
 }
 
+__global__ void AddVelocityKernel(
+    float* u, float* v,
+    int width, int height,
+    int cx, int cy, int radius,
+    float2 force)
+{
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
+    if (x >= width || y >= height) return;
+
+    int dx = x - cx;
+    int dy = y - cy;
+    if (dx * dx + dy * dy < radius * radius) {
+        int idx = y * width + x;
+        u[idx] += force.x;
+        v[idx] += force.y;
+    }
+}
+
+__global__ void AddDensityKernel(float* dens, int width, int height,
+    int cx, int cy, int radius, float amount) {
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
+    if (x >= width || y >= height) return;
+
+    int dx = x - cx;
+    int dy = y - cy;
+    if (dx * dx + dy * dy < radius * radius) {
+        int idx = y * width + x;
+        dens[idx] += amount;
+    }
+}
+
 // map density to color
 __device__ float4 density_to_color(float v) {
     return make_float4(saturatef(v), saturatef(v*0.3f), saturatef(1.0f - v), 1.0f);
@@ -207,6 +240,19 @@ void FluidSimulation::setInitialCondition(const float* hostData) {
         cudaMemcpy(m_devCurrent, hostData, size, cudaMemcpyHostToDevice);
     else
         cudaMemset(m_devCurrent, 0, size);
+}
+
+void FluidSimulation::injectFromMouse(int x, int y, float2 force, bool addDensity) {
+    dim3 block(16, 16);
+    dim3 grid((m_width + block.x - 1) / block.x, (m_height + block.y - 1) / block.y);
+
+    int radius = 10;
+    AddVelocityKernel<<<grid, block>>>(m_velU, m_velV, m_width, m_height, x, y, radius, force);
+
+    if (addDensity) {
+        AddDensityKernel<<<grid, block>>>(m_devCurrent, m_width, m_height, x, y, radius, 2.0f);
+    }
+    cudaDeviceSynchronize();
 }
 
 // helper: perform Jacobi iterations (b is RHS, x_old input, x_out will hold next)
