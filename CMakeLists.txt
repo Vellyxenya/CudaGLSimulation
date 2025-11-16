@@ -1,6 +1,6 @@
 # CMake project for remote_sim_gl
 cmake_minimum_required(VERSION 3.10)
-project(RemoteSimGL LANGUAGES C CXX CUDA)
+project(CudaGLSimulation LANGUAGES C CXX CUDA)
 
 set(CMAKE_CXX_STANDARD 17)
 
