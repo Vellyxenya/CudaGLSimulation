@@ -14,9 +14,8 @@ std::string loadShaderSource(const std::string& path) {
         return "";
     }
 
-    // Read file into a string buffer
     std::stringstream buffer;
-    buffer << file.rdbuf();
+    buffer << file.rdbuf(); // Read all file contents into string
     return buffer.str();
 }
 
@@ -24,14 +23,14 @@ GLuint compileShader(GLenum type, const std::string& source) {
     GLuint shader = glCreateShader(type);
 
     const char* src = source.c_str();
-    glShaderSource(shader, 1, &src, nullptr);
-    glCompileShader(shader);
+    glShaderSource(shader, 1, &src, nullptr); // Attach source to shader
+    glCompileShader(shader);                  // Compile shader
 
-    // Check compilation status
+    // Check if compilation succeeded
     GLint compiled = 0;
     glGetShaderiv(shader, GL_COMPILE_STATUS, &compiled);
     if (!compiled) {
-        // Retrieve and print the compilation log
+        // Retrieve and print compilation errors
         GLint len;
         glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &len);
         std::string log(len, ' ');
@@ -46,7 +45,7 @@ GLuint compileShader(GLenum type, const std::string& source) {
 }
 
 GLuint createProgram(const std::string& vertexPath, const std::string& fragmentPath) {
-    // Load GLSL sources
+    // Load GLSL sources from files
     std::string vertSrc = loadShaderSource(vertexPath);
     std::string fragSrc = loadShaderSource(fragmentPath);
     if (vertSrc.empty() || fragSrc.empty()) return 0;
@@ -56,13 +55,13 @@ GLuint createProgram(const std::string& vertexPath, const std::string& fragmentP
     GLuint fragShader = compileShader(GL_FRAGMENT_SHADER, fragSrc);
     if (!vertShader || !fragShader) return 0;
 
-    // Create program and attach shaders
+    // Create program and attach compiled shaders
     GLuint program = glCreateProgram();
     glAttachShader(program, vertShader);
     glAttachShader(program, fragShader);
-    glLinkProgram(program);
+    glLinkProgram(program); // Link shaders into a GPU program
 
-    // Check linking status
+    // Check if linking succeeded
     GLint linked;
     glGetProgramiv(program, GL_LINK_STATUS, &linked);
     if (!linked) {
@@ -77,7 +76,7 @@ GLuint createProgram(const std::string& vertexPath, const std::string& fragmentP
         program = 0;
     }
 
-    // Clean up shaders; they are no longer needed after linking
+    // Delete shaders after linking; they are no longer needed on GPU
     glDeleteShader(vertShader);
     glDeleteShader(fragShader);
 
