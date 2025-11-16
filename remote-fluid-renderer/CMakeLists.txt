@@ -32,13 +32,7 @@ add_executable(sim ${SRC_FILES} ${CU_FILES} ${HEADER_FILES} ${GLAD_SRC})
 target_include_directories(sim PRIVATE include 
   include
   deps/glm
-  deps/nvcodec/Interface
-  deps/glad/include) #  deps/libwebrtc)
-
-# Link directories
-target_link_directories(sim PRIVATE
-  deps/nvcodec/Lib/linux/stubs/x86_64
-) # deps/libwebrtc/out/Default/obj
+  deps/glad/include))
 
 # Link libraries
 target_link_libraries(sim PRIVATE
