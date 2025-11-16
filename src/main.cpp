@@ -85,6 +85,9 @@ int main(int argc, char** argv) {
 
     // ---------------------------------------------------------
     // Parse CLI arguments (very minimal parser)
+    // This could (and should) be replaced with a proper CLI
+    // parsing library such as cxxopts or CLI11 but I am keeping
+    // it simple for this demo.
     // ---------------------------------------------------------
     enum class SimulationType { Fluid, Heat };
     SimulationType simType = SimulationType::Fluid;
@@ -96,9 +99,9 @@ int main(int argc, char** argv) {
         std::string a = argv[i];
         if (a == "--heat")
             simType = SimulationType::Heat;
-        else if (a.rfind("--width=", 0) == 0)
+        if (a.rfind("--width=", 0) == 0)
             width = std::stoi(a.substr(8));
-        else if (a.rfind("--height=", 0) == 0)
+        if (a.rfind("--height=", 0) == 0)
             height = std::stoi(a.substr(9));
     }
 
