@@ -7,13 +7,6 @@
 #include <iostream>
 #include <sstream>
 
-void checkGLError(const char* context) {
-    GLenum err;
-    while ((err = glGetError()) != GL_NO_ERROR) {
-        std::cerr << "[OpenGL Error] (" << std::hex << err << ") at " << context << std::endl;
-    }
-}
-
 std::string loadShaderSource(const std::string& path) {
     std::ifstream file(path);
     if (!file.is_open()) {

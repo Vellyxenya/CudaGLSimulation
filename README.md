@@ -1,11 +1,30 @@
-# RemoteSimGL
+# Remote Fluid Renderer
 
-This project showcases remote rendering of physics simulations via WebRTC.
+Real-time 2D fluid simulation with CUDA and OpenGL interop.
 
-There are 2 subfolders:
-1. remote_fluid_renderer
-2. frontend
+## Structure
+- **deps/**: External dependencies (glad)
+- **include/**: C++ headers
+- **shaders/**: GLSL shaders
+- **src/**: C++ source files
 
+## Build and Run
+1. Create the `build` directory and `cd` into it:
+```bash
+mkdir build; cd build
+```
 
-# Setup
-On Windows you need an X-Server running. Download `VcXsrv` on your host and run it.
+2. Configure cmake:
+```bash
+cmake ..
+```
+
+3. Build:
+```bash
+cmake --build . --config Release --target sim
+```
+
+4. Run:
+```bash
+.\Release\sim.exe
+```

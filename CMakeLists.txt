@@ -17,6 +17,14 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(glfw)
 
+FetchContent_Declare(
+	glm
+	GIT_REPOSITORY	https://github.com/g-truc/glm.git
+	GIT_TAG 	0af55ccecd98d4e5a8d1fad7de25ba429d60e863 #refs/tags/1.0.1
+)
+
+FetchContent_MakeAvailable(glm)
+
 find_package(CUDAToolkit REQUIRED)
 
 # Define source files
@@ -31,8 +39,7 @@ add_executable(sim ${SRC_FILES} ${CU_FILES} ${HEADER_FILES} ${GLAD_SRC})
 # Include directories
 target_include_directories(sim PRIVATE include 
   include
-  deps/glm
-  deps/glad/include))
+  deps/glad/include)
 
 # Link libraries
 target_link_libraries(sim PRIVATE
@@ -42,6 +49,7 @@ target_link_libraries(sim PRIVATE
   opengl32
   gdi32
   user32
+  glm::glm
 )
 
 # Enable separate compilation for CUDA files

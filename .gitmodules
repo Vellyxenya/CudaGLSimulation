@@ -1,3 +1,0 @@
-[submodule "remote-fluid-renderer/deps/glm"]
-	path = remote-fluid-renderer/deps/glm
-	url = https://github.com/g-truc/glm.git
