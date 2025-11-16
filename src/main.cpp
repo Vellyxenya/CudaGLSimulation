@@ -1,130 +1,68 @@
 // src/main.cpp
-
-/*
-Detailed overview and notes (for documentation / Medium article):
-
-This file is the top-level application for the RemoteSimGL demo. It does
-the following at a high level:
-- Initializes a GLFW window and OpenGL context (via `initWindow`).
-- Loads OpenGL entry points with `glad`.
-- Selects a CUDA device with `cudaSetDevice(0)` for running CUDA kernels.
-- Creates a `gl::Renderer` which sets up an OpenGL Pixel Buffer Object
-    (PBO) and a texture; the PBO is registered with CUDA so kernels can
-    write pixels directly into GPU memory.
-- Creates either a `FluidSimulation` or `HeatSimulation` object which
-    implements `step()` to run CUDA kernels that write into the PBO.
-- Enters the main loop where, each frame, it maps the PBO for CUDA, runs
-    the simulation step, unmaps the PBO, and draws the texture to the
-    screen. Mouse input is translated into simulation-space forces for the
-    fluid simulation.
-
-Key symbols / calls explained:
-- `WIN32_LEAN_AND_MEAN`:
-    - Tells `<Windows.h>` to exclude rarely-used APIs, reducing namespace
-        pollution and slightly speeding compilation.
-
-- `__declspec(dllexport)` variables (below):
-    - The exported globals `NvOptimusEnablement` and
-        `AmdPowerXpressRequestHighPerformance` are a common, pragmatic way
-        to hint to laptop GPU drivers that the program prefers the
-        high-performance discrete GPU. They are not a CUDA call; they cause
-        the loader/driver to prefer the discrete GPU when available. This is
-        useful on hybrid-graphics machines where an integrated GPU is the
-        default.
-
-- `<chrono>, <iostream>, <string>`:
-    - Standard C++ headers used for timing, logging, and simple CLI
-        parsing / string manipulation.
-
-- `<glad/gl.h>`:
-    - glad is a GL loader. On many platforms (including Windows), OpenGL
-        functions are not available as static link symbols; glad queries the
-        function pointers at runtime after an OpenGL context is created.
-
-- `<GLFW/glfw3.h>`:
-    - GLFW provides a simple cross-platform API to create windows and
-        OpenGL contexts and to handle input (keyboard, mouse). `glfwInit()`
-        initializes the library; `glfwCreateWindow(...)` creates a window +
-        context; `glfwMakeContextCurrent(...)` binds the context to the
-        calling thread.
-
-- `glViewport(...)` and `glClearColor(...)`:
-    - `glViewport` sets the pixel-to-NDC mapping for rendering; match it
-        to the window size. `glClearColor` specifies the default color used
-        when clearing the color buffer.
-
-- `cudaSetDevice(0)`:
-    - Selects the CUDA device index for the current host thread. On a
-        multi-GPU system you may change the index; `0` is commonly the
-        first visible device. This does not change the GL context's GPU by
-        itself, but it sets which GPU subsequent CUDA calls will target.
-
-- `mapCudaResource()` / `unmapCudaResource()` (renderer):
-    - These functions coordinate CUDA-OpenGL interop. Mapping returns a
-        device pointer that CUDA kernels can write to; unmapping returns
-        control to OpenGL so the texture can be used for rendering.
-
-- `dynamic_cast<FluidSimulation*>(simulation)`:
-    - At runtime we check whether the `Simulation*` is a `FluidSimulation`
-        so we can enable mouse-driven interaction only for the fluid sim.
-
-Notes about maintainability and suggestions:
-- The main uses `new` to allocate the simulation and never `delete`s it.
-    This is fine for a short-lived demo that exits immediately, but for
-    production code prefer `std::unique_ptr` to make ownership explicit.
-- CLI parsing here is intentionally minimal. If you want better UX,
-    add a `--help` flag and validate numeric args with clear errors.
-
-The remainder of the file contains the concrete implementation; inline
-comments throughout the file provide more focused explanations at each
-call site (GLFW initialization, window creation, mapping/unmapping,
-mouse coordinate mapping, and cleanup).
-*/
+// -----------------------------------------------------------------------------
+// Entry point for a CUDA + OpenGL fluid/heat simulation.
+// Creates an OpenGL window, initializes CUDA-interop rendering,
+// and runs either a heat diffusion sim or a Navier–Stokes fluid sim.
+// -----------------------------------------------------------------------------
 
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
+// -----------------------------------------------------------------------------
+// GPU selection exports
+// These are special Windows exports that force laptops with hybrid GPUs
+// (Optimus / AMD switchable graphics) to launch the program on the high-performance GPU.
+// -----------------------------------------------------------------------------
 extern "C" {
-    __declspec(dllexport) DWORD NvOptimusEnablement = 0x00000001; // NVIDIA GPU
-    __declspec(dllexport) DWORD AmdPowerXpressRequestHighPerformance = 0x00000001; // AMD GPU
+    __declspec(dllexport) DWORD NvOptimusEnablement = 0x00000001;               // Prefer NVIDIA GPU
+    __declspec(dllexport) DWORD AmdPowerXpressRequestHighPerformance = 0x00000001; // Prefer AMD GPU
 }
 
 #include <chrono>
 #include <iostream>
 #include <string>
-#include <glad/gl.h>
-#include <GLFW/glfw3.h>
+#include <glad/gl.h>     // Modern OpenGL function loader
+#include <GLFW/glfw3.h>  // Window + context + input
 #include <glm/glm.hpp>
 
-#include "gl/renderer.hpp"
-#include "gl/heat_simulation.hpp"
-#include "gl/fluid_simulation.hpp"
+#include "gl/renderer.hpp"         // CUDA-PBO interop renderer
+#include "gl/heat_simulation.hpp"  // Heat diffusion simulation
+#include "gl/fluid_simulation.hpp" // Fluid simulation (Navier–Stokes)
 
-// Default window size; can be overridden on the command line with
-// `--width=<n>` and `--height=<n>`.
+// -----------------------------------------------------------------------------
+// Default window size. These can be overridden using:
+//   --width=<N>
+//   --height=<N>
+// -----------------------------------------------------------------------------
 const int DEFAULT_WIDTH  = 800;
 const int DEFAULT_HEIGHT = 600;
 
+// -----------------------------------------------------------------------------
+// Initializes a GLFW window and an OpenGL 4.3 core context.
+// Also loads OpenGL function pointers using GLAD.
+// -----------------------------------------------------------------------------
 GLFWwindow* initWindow(int width, int height) {
     if (!glfwInit()) {
         std::cerr << "Failed to initialize GLFW\n";
         return nullptr;
     }
 
-    // Request OpenGL 4.3 core profile
+    // Request a reasonably modern OpenGL version (needed for compute shaders, SSBO, etc.)
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
+    // Create window + OpenGL context
     GLFWwindow* window = glfwCreateWindow(width, height, "CUDA FluidSim", nullptr, nullptr);
     if (!window) {
         std::cerr << "Failed to create GLFW window\n";
         glfwTerminate();
         return nullptr;
     }
+
     glfwMakeContextCurrent(window);
 
-    // Load all GL entry points
+    // Load OpenGL function pointers through GLAD
     if (!gladLoaderLoadGL()) {
         std::cerr << "Failed to initialize GLAD\n";
         glfwDestroyWindow(window);
@@ -132,62 +70,90 @@ GLFWwindow* initWindow(int width, int height) {
         return nullptr;
     }
 
+    // Set initial viewport and clear color
     glViewport(0, 0, width, height);
     glClearColor(0.8f, 0.8f, 1.0f, 1.0f);
+
     return window;
 }
 
+// -----------------------------------------------------------------------------
+// MAIN
 // Usage: sim.exe [--heat] [--width=<n>] [--height=<n>]
+// -----------------------------------------------------------------------------
 int main(int argc, char** argv) {
-    // Simulation selection and parameter defaults. Use command-line flags
-    // to override these simple defaults.
+
+    // ---------------------------------------------------------
+    // Parse CLI arguments (very minimal parser)
+    // ---------------------------------------------------------
     enum class SimulationType { Fluid, Heat };
     SimulationType simType = SimulationType::Fluid;
 
-    // Window size (override with CLI)
-    int width = DEFAULT_WIDTH;
+    int width  = DEFAULT_WIDTH;
     int height = DEFAULT_HEIGHT;
 
-    // Minimal CLI parsing: supports --heat, --width=, --height= flags.
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
-        if (a == "--heat") simType = SimulationType::Heat;
-        else if (a.rfind("--width=", 0) == 0) width = std::stoi(a.substr(8));
-        else if (a.rfind("--height=", 0) == 0) height = std::stoi(a.substr(9));
+        if (a == "--heat")
+            simType = SimulationType::Heat;
+        else if (a.rfind("--width=", 0) == 0)
+            width = std::stoi(a.substr(8));
+        else if (a.rfind("--height=", 0) == 0)
+            height = std::stoi(a.substr(9));
     }
 
-    // Initialize the GL window with the chosen size.
+    // ---------------------------------------------------------
+    // Initialize OpenGL window
+    // ---------------------------------------------------------
     GLFWwindow* window = initWindow(width, height);
     if (!window) return -1;
 
+    // Force CUDA to use device 0 (no multi-GPU support here)
     cudaSetDevice(0);
 
-    // Create the renderer (sets up PBO, texture, CUDA interop, VAO, shaders)
+    // Create renderer: sets up:
+    // - OpenGL pixel buffer (PBO)
+    // - CUDA access to that PBO
+    // - Texture used for on-screen display
+    // - Fullscreen quad & shaders
     gl::Renderer renderer(width, height);
 
+    // Print GPU renderer information
     const GLubyte* r = glGetString(GL_RENDERER);
     std::cout << "Renderer: " << r << std::endl;
 
-    // Instantiate the chosen simulation with the configured parameters.
+    // ---------------------------------------------------------
+    // Create simulation object based on CLI flags
+    // ---------------------------------------------------------
     Simulation* simulation = nullptr;
+
     if (simType == SimulationType::Heat) {
-        const float heatDt = 0.6f;
-        const float diffusion = 0.2f;
-        const float sourceHeat = 5.0f;
-        simulation = new HeatSimulation(width, height, heatDt, heatDiffusion, heatSource);
+        const float heatDt        = 0.6f;
+        const float diffusion     = 0.2f;
+        const float sourceHeat    = 5.0f;
+
+        // HeatSimulation(width, height, dt, diffusionConstant, injectedHeatPerClick)
+        simulation = new HeatSimulation(width, height, heatDt, diffusion, sourceHeat);
     } else {
         float fluidDt = 0.09f;
         simulation = new FluidSimulation(width, height, fluidDt);
     }
 
+    // ---------------------------------------------------------
+    // FPS measurement setup
+    // ---------------------------------------------------------
     int frames = 0;
     auto lastTime = std::chrono::high_resolution_clock::now();
 
-    // Main loop
+    // -------------------------------------------------------------------------
+    // MAIN RENDER LOOP
+    // -------------------------------------------------------------------------
     while (!glfwWindowShouldClose(window)) {
         auto currentTime = std::chrono::high_resolution_clock::now();
         frames++;
-        float delta = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - lastTime).count();
+
+        // Every second: update window title with FPS
+        float delta = std::chrono::duration<float>(currentTime - lastTime).count();
         if (delta >= 1.0f) {
             std::string title = "CUDA HeatSim - FPS: " + std::to_string(frames);
             glfwSetWindowTitle(window, title.c_str());
@@ -195,34 +161,46 @@ int main(int argc, char** argv) {
             lastTime = currentTime;
         }
 
-        // 1) Map the CUDA-accessible PBO and get the device pointer
+        // ---------------------------------------------------------------------
+        // STEP 1: Map the CUDA PBO and get direct device pointer to pixel buffer
+        // This pointer is written into directly by the simulation kernel.
+        // ---------------------------------------------------------------------
         uchar4* devPtr = renderer.mapCudaResource();
 
-        // 2) Handle input / user interaction (mouse). Only applies to `FluidSimulation`.
+        // ---------------------------------------------------------------------
+        // STEP 2: Mouse interaction (FluidSimulation only)
+        // Adds velocity & dye into the simulation grid based on mouse drag.
+        // ---------------------------------------------------------------------
         FluidSimulation* fluidSim = dynamic_cast<FluidSimulation*>(simulation);
         if (fluidSim) {
             static double prevX = 0.0, prevY = 0.0;
             double mouseX, mouseY;
             glfwGetCursorPos(window, &mouseX, &mouseY);
 
-            int leftDown = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT);
+            int leftDown  = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT);
             int rightDown = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT);
 
-            // Map window coords to simulation coords (note Y flip)
-            int simX = static_cast<int>(mouseX / width * fluidSim->width());
+            // Convert screen coordinates → simulation cell coordinates
+            int simX = static_cast<int>(mouseX / width  * fluidSim->width());
             int simY = static_cast<int>((height - mouseY) / height * fluidSim->height()); // flip Y
 
-            float2 mouseVel = make_float2(static_cast<float>(mouseX - prevX),
-                static_cast<float>(prevY - mouseY)); // note inverted Y
+            // Calculate mouse velocity (used to inject force)
+            float2 mouseVel = make_float2(
+                static_cast<float>(mouseX - prevX),
+                static_cast<float>(prevY - mouseY) // inverted Y
+            );
+
             prevX = mouseX;
             prevY = mouseY;
 
+            // Left mouse = inject velocity + smoke
             if (leftDown == GLFW_PRESS) {
                 float scale = 0.3f;
                 fluidSim->injectFromMouse(simX, simY,
                     make_float2(mouseVel.x * scale, mouseVel.y * scale),
                     true);
             }
+            // Right mouse = inject opposite velocity (suction)
             else if (rightDown == GLFW_PRESS) {
                 float scale = 0.3f;
                 fluidSim->injectFromMouse(simX, simY,
@@ -231,22 +209,32 @@ int main(int argc, char** argv) {
             }
         }
 
-        // 3) Advance the simulation (one timestep). Implementation depends on concrete sim.
+        // ---------------------------------------------------------------------
+        // STEP 3: Run one simulation step (CUDA kernel inside each sim class)
+        // Writes directly into devPtr (mapped PBO).
+        // ---------------------------------------------------------------------
         simulation->step(devPtr);
 
-        // 4) Unmap so OpenGL can use the updated PBO
+        // ---------------------------------------------------------------------
+        // STEP 4: Unmap CUDA resource so OpenGL can safely read it again.
+        // ---------------------------------------------------------------------
         renderer.unmapCudaResource();
 
-        // 5) Render: upload PBO→texture and draw fullscreen quad
+        // ---------------------------------------------------------------------
+        // STEP 5: Render the texture updated by CUDA
+        // (PBO → texture upload, then fullscreen quad draw)
+        // ---------------------------------------------------------------------
         glClear(GL_COLOR_BUFFER_BIT);
         renderer.draw();
 
-        // Swap & poll
+        // Swap buffers and poll events
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
 
-    // Cleanup
+    // -------------------------------------------------------------------------
+    // Clean shutdown
+    // -------------------------------------------------------------------------
     renderer.cleanup();
     glfwDestroyWindow(window);
     glfwTerminate();
