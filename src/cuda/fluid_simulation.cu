@@ -14,16 +14,8 @@ static const int ITER = 20; // Jacobi iterations for diffusion / Poisson solves
 
 // ------------------- helpers -------------------
 
-// Linear index from 2D coordinates
-__device__ __forceinline__ int idx(int x, int y, int w) { return y * w + x; }
-
-// clamp float value between a and b
-__device__ __forceinline__ float clampf(float v, float a, float b) {
-    return v < a ? a : (v > b ? b : v);
-}
-
 // Bilinear sampling of a 2D field, used in semi-Lagrangian advection
-__device__ __forceinline__ float bilinear_sample(const float* grid, float x, float y, int width, int height) {
+__device__ __forceinline__ float bilinearSample(const float* grid, float x, float y, int width, int height) {
     // Clamp coordinates slightly inside to avoid out-of-bounds access
     float x_clamped = clampf(x, 0.0f, (float)width - 1.001f);
     float y_clamped = clampf(y, 0.0f, (float)height - 1.001f);
@@ -54,7 +46,7 @@ __device__ __forceinline__ float bilinear_sample(const float* grid, float x, flo
 // ------------------- kernels -------------------
 
 // Add swirling force to velocity field (for visualization/demo purposes)
-__global__ void add_swirl_kernel(float* u, float* v, int width, int height, float time, float strength) {
+__global__ void addSwirlKernel(float* u, float* v, int width, int height, float time, float strength) {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
     if (x >= width || y >= height) return;
@@ -79,7 +71,7 @@ __global__ void add_swirl_kernel(float* u, float* v, int width, int height, floa
 }
 
 // Add density at center (circular blob)
-__global__ void inject_density_kernel(float* dens, int width, int height, float amount, float radius) {
+__global__ void injectDensityKernel(float* dens, int width, int height, float amount, float radius) {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
     if (x >= width || y >= height) return;
@@ -95,7 +87,7 @@ __global__ void inject_density_kernel(float* dens, int width, int height, float 
 }
 
 // Jacobi iteration for solving linear systems (e.g., diffusion or Poisson equation)
-__global__ void jacobi_kernel(const float* b, const float* x_old, float* x_out, float a, float c, int width, int height) {
+__global__ void jacobiKernel(const float* b, const float* x_old, float* x_out, float a, float c, int width, int height) {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
     if (x >= width || y >= height) return;
@@ -112,7 +104,7 @@ __global__ void jacobi_kernel(const float* b, const float* x_old, float* x_out, 
 }
 
 // Compute divergence = du/dx + dv/dy (negative convention for projection)
-__global__ void compute_divergence_kernel(const float* u, const float* v, float* div, int width, int height) {
+__global__ void computeDivergenceKernel(const float* u, const float* v, float* div, int width, int height) {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
     if (x >= width || y >= height) return;
@@ -128,7 +120,7 @@ __global__ void compute_divergence_kernel(const float* u, const float* v, float*
 }
 
 // Subtract pressure gradient from velocity to enforce incompressibility
-__global__ void project_kernel(float* u, float* v, const float* p, int width, int height) {
+__global__ void projectKernel(float* u, float* v, const float* p, int width, int height) {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
     if (x >= width || y >= height) return;
@@ -145,7 +137,7 @@ __global__ void project_kernel(float* u, float* v, const float* p, int width, in
 
 // Semi-Lagrangian advection for scalar or velocity components
 // Trace backward along velocity field to interpolate previous value
-__global__ void advect_kernel(const float* d0, float* d, const float* u, const float* v, int width, int height, float dt) {
+__global__ void advectKernel(const float* d0, float* d, const float* u, const float* v, int width, int height, float dt) {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
     if (x >= width || y >= height) return;
@@ -155,7 +147,7 @@ __global__ void advect_kernel(const float* d0, float* d, const float* u, const f
     float py = y - v[id] * dt; // backtrace y
 
     // bilinear interpolation from previous grid
-    d[id] = bilinear_sample(d0, px, py, width, height);
+    d[id] = bilinearSample(d0, px, py, width, height);
 }
 
 // Add velocity at a point (e.g., from mouse)
@@ -187,17 +179,14 @@ __global__ void AddDensityKernel(float* dens, int width, int height, int cx, int
     }
 }
 
-// Map density to RGBA color for rendering
-__device__ float4 density_to_color(float v) {
-    return make_float4(saturatef(v), saturatef(v*0.3f), saturatef(1.0f - v), 1.0f);
-}
-
-__global__ void density_to_color_kernel(const float* dens, uchar4* out, int width, int height) {
+// Convert input grid to uchar4 buffer for OpenGL rendering
+__global__ void densityToColorKernel(const float* input, uchar4* buffer, int width, int height) {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
     if (x >= width || y >= height) return;
+
     int id = idx(x, y, width);
-    out[id] = floatToUchar4(density_to_color(dens[id]));
+    buffer[id] = floatToUchar4(toColor(input[id]));
 }
 
 // ------------------- FluidSimulation class -------------------
@@ -251,21 +240,21 @@ void FluidSimulation::injectFromMouse(int x, int y, float2 force, bool addDensit
 }
 
 // Perform Jacobi iterations for implicit solves (diffusion, Poisson)
-void jacobi_solve(const float* b, float* x, float* x_temp, float a, float c, int width, int height) {
+void jacobiSolve(const float* b, float* x, float* x_temp, float a, float c, int width, int height) {
     dim3 block(16, 16);
     dim3 grid((width + block.x - 1) / block.x, (height + block.y - 1) / block.y);
     for (int i = 0; i < ITER; ++i) {
-        jacobi_kernel<<<grid, block>>>(b, x, x_temp, a, c, width, height);
+        jacobiKernel<<<grid, block>>>(b, x, x_temp, a, c, width, height);
         cudaDeviceSynchronize();
         std::swap(x, x_temp);
     }
 }
 
 // Diffuse velocity using implicit method: solves (u - a*Laplace(u)) = u0
-void diffuse_velocity(float* u, float* u_temp, int width, int height, float visc, float dt) {
+void diffuseVelocity(float* u, float* u_temp, int width, int height, float visc, float dt) {
     float a = dt * visc;
     float c = 1.0f + 4.0f * a;
-    jacobi_solve(u, u_temp, u, a, c, width, height);
+    jacobiSolve(u, u_temp, u, a, c, width, height);
 }
 
 // Project velocity field to be divergence-free (incompressible)
@@ -277,7 +266,7 @@ void project(float* u, float* v, float* pressure, float* divergence, float* temp
     dim3 grid((width + block.x - 1) / block.x, (height + block.y - 1) / block.y);
 
     // compute divergence
-    compute_divergence_kernel<<<grid, block>>>(u, v, divergence, width, height);
+    computeDivergenceKernel<<<grid, block>>>(u, v, divergence, width, height);
     cudaDeviceSynchronize();
 
     // initialize pressure to zero
@@ -291,20 +280,20 @@ void project(float* u, float* v, float* pressure, float* divergence, float* temp
 
     // Jacobi iterations to solve Laplace(p) = divergence
     for (int i = 0; i < ITER; ++i) {
-        jacobi_kernel<<<grid, block>>>(divergence, pressure, temp, a, c, width, height);
+        jacobiKernel<<<grid, block>>>(divergence, pressure, temp, a, c, width, height);
         cudaDeviceSynchronize();
         std::swap(pressure, temp);
     }
 
-    project_kernel<<<grid, block>>>(u, v, pressure, width, height);
+    projectKernel<<<grid, block>>>(u, v, pressure, width, height);
     cudaDeviceSynchronize();
 }
 
 // Semi-Lagrangian advection wrapper
-void advect_field(const float* d0, float* d, const float* u, const float* v, int width, int height, float dt) {
+void advectField(const float* d0, float* d, const float* u, const float* v, int width, int height, float dt) {
     dim3 block(16, 16);
     dim3 grid((width + block.x - 1) / block.x, (height + block.y - 1) / block.y);
-    advect_kernel<<<grid, block>>>(d0, d, u, v, width, height, dt);
+    advectKernel<<<grid, block>>>(d0, d, u, v, width, height, dt);
     cudaDeviceSynchronize();
 }
 
@@ -315,19 +304,19 @@ void FluidSimulation::step(uchar4* pbo) {
 
     // 1) add swirling force
     float time = (float)clock() / (float)CLOCKS_PER_SEC;
-    add_swirl_kernel<<<grid, block>>>(m_velU, m_velV, m_width, m_height, time, 1.0f);
+    addSwirlKernel<<<grid, block>>>(m_velU, m_velV, m_width, m_height, time, 1.0f);
     cudaDeviceSynchronize();
 
     // 2) diffuse velocity
-    diffuse_velocity(m_velU, m_velNextU, m_width, m_height, m_viscosity, m_dt);
-    diffuse_velocity(m_velV, m_velNextV, m_width, m_height, m_viscosity, m_dt);
+    diffuseVelocity(m_velU, m_velNextU, m_width, m_height, m_viscosity, m_dt);
+    diffuseVelocity(m_velV, m_velNextV, m_width, m_height, m_viscosity, m_dt);
 
     // 3) project to divergence-free
     project(m_velU, m_velV, m_pressure, m_divergence, m_velNextU, m_width, m_height);
 
     // 4) advect velocity (semi-Lagrangian)
-    advect_field(m_velU, m_velNextU, m_velU, m_velV, m_width, m_height, m_dt);
-    advect_field(m_velV, m_velNextV, m_velU, m_velV, m_width, m_height, m_dt);
+    advectField(m_velU, m_velNextU, m_velU, m_velV, m_width, m_height, m_dt);
+    advectField(m_velV, m_velNextV, m_velU, m_velV, m_width, m_height, m_dt);
 
     // swap advected velocities into current
     std::swap(m_velU, m_velNextU);
@@ -337,7 +326,7 @@ void FluidSimulation::step(uchar4* pbo) {
     project(m_velU, m_velV, m_pressure, m_divergence, m_velNextU, m_width, m_height);
 
     // 6) inject density at center
-    inject_density_kernel<<<grid, block>>>(m_devCurrent, m_width, m_height, m_sourceDensity * m_dt, 6.0f);
+    injectDensityKernel<<<grid, block>>>(m_devCurrent, m_width, m_height, m_sourceDensity * m_dt, 6.0f);
     cudaDeviceSynchronize();
 
     // 7) diffuse density (optional)
@@ -347,17 +336,17 @@ void FluidSimulation::step(uchar4* pbo) {
         // perform Jacobi iterations: b = dens, x = dens, temp = m_devNext
         // we reuse m_devNext as temp buffer
         for (int i = 0; i < ITER; ++i) {
-            jacobi_kernel<<<grid, block>>>(m_devCurrent, m_devCurrent, m_devNext, a, c, m_width, m_height);
+            jacobiKernel<<<grid, block>>>(m_devCurrent, m_devCurrent, m_devNext, a, c, m_width, m_height);
             cudaDeviceSynchronize();
             std::swap(m_devCurrent, m_devNext);
         }
     }
 
     // 8) advect density
-    advect_field(m_devCurrent, m_devNext, m_velU, m_velV, m_width, m_height, m_dt);
+    advectField(m_devCurrent, m_devNext, m_velU, m_velV, m_width, m_height, m_dt);
 
     // 9) render density to PBO
-    density_to_color_kernel<<<grid, block>>>(m_devNext, pbo, m_width, m_height);
+    densityToColorKernel<<<grid, block>>>(m_devNext, pbo, m_width, m_height);
     cudaDeviceSynchronize();
 
     // Swap grids for next timestep (ping-pong buffer)

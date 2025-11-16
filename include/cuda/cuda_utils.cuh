@@ -48,3 +48,18 @@ __device__ __forceinline__ uchar4 floatToUchar4(float4 f) {
         saturatef(f.w) * 255.0f   // A
     );
 }
+
+// Linear index from 2D coordinates
+__device__ __forceinline__ int idx(int x, int y, int w) { return y * w + x; }
+
+// clamp float value between a and b
+__device__ __forceinline__ float clampf(float v, float a, float b) {
+    return v < a ? a : (v > b ? b : v);
+}
+
+// Map value to RGB color for visualization
+// Simple linear mapping: low values -> blue, high values -> red
+__device__ __forceinline__ float4 toColor(float value) {
+    // Saturate value to [0,1] to avoid color overflow
+    return make_float4(saturatef(value),  saturatef(value*0.3f), saturatef(1.0f - value), 1.0f);
+}

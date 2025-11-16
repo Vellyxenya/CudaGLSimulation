@@ -45,21 +45,14 @@ __global__ void heatStepKernel(const float* current, float* next, int width, int
     }
 }
 
-// Map heat value to RGB color for visualization
-// Simple linear mapping: low values -> blue, high values -> red
-__device__ float4 heatToColor(float value) {
-    // Saturate value to [0,1] to avoid color overflow
-    return make_float4(saturatef(value), 0.0f, saturatef(1.0f - value), 1.0f);
-}
-
-// Convert entire heat grid to uchar4 buffer for OpenGL rendering
-__global__ void heatToColorKernel(const float* heat, uchar4* buffer, int width, int height) {
+// Convert input grid to uchar4 buffer for OpenGL rendering
+__global__ void heatToColorKernel(const float* input, uchar4* buffer, int width, int height) {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
     if (x >= width || y >= height) return;
 
-    int idx = y * width + x;
-    buffer[idx] = floatToUchar4(heatToColor(heat[idx]));
+    int id = idx(x, y, width);
+    buffer[id] = floatToUchar4(toColor(input[id]));
 }
 
 // -----------------------------------------------------------------------------
