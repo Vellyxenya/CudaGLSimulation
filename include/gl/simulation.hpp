@@ -17,7 +17,21 @@
 
 class Simulation {
 public:
-    virtual ~Simulation() = default;
+    // -------------------------------------------------------------------------
+    // Constructor
+    // Initializes simulation grid size and allocates device memory
+    // -------------------------------------------------------------------------
+    Simulation(int width, int height) : m_width(width), m_height(height),
+        m_devCurrent(nullptr), m_devNext(nullptr) {}
+
+    // -------------------------------------------------------------------------
+    // Destructor
+    // Frees device memory allocated for simulation grids
+    // -------------------------------------------------------------------------
+    virtual ~Simulation() {
+        cudaFree(m_devCurrent);
+        cudaFree(m_devNext);
+    }
 
     // -------------------------------------------------------------------------
     // step(pbo)
@@ -31,4 +45,15 @@ public:
     //           writing. The simulation never allocates or frees this buffer.
     // -------------------------------------------------------------------------
     virtual void step(uchar4* pbo) = 0;
+
+protected:
+    // -----------------------------
+    // Density grids (float per cell)
+    // Ping-pong buffers for current/next values
+    // -----------------------------
+    float* m_devCurrent;
+    float* m_devNext;
+
+    int m_width;       // Grid width
+    int m_height;      // Grid height
 };

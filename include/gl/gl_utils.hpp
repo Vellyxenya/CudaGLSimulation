@@ -11,42 +11,25 @@
 #include <glad/gl.h>
 
 // -----------------------------------------------------------------------------
-// loadShaderSource(path)
-// Reads a text file from disk and returns its contents as a std::string.
-// Used for loading GLSL vertex/fragment shader source code.
-//
-// Expected usage:
-//     std::string vs = loadShaderSource("shaders/fullscreen.vert");
-//     std::string fs = loadShaderSource("shaders/heat.frag");
+// Reads the entire contents of a text file into a string
+// Used for loading GLSL shader source code from disk
 // -----------------------------------------------------------------------------
 std::string loadShaderSource(const std::string& path);
 
 // -----------------------------------------------------------------------------
-// compileShader(type, source)
-// Compiles a GLSL shader of a given type (GL_VERTEX_SHADER or
-// GL_FRAGMENT_SHADER) from a source string.
-//
-// Returns:
-//     - GLuint shader handle (non-zero) on success
-//     - 0 on compilation failure (errors printed to console)
-//
-// Notes:
-//   - Compilation errors are extremely common during development.
-//   - This helper isolates the boilerplate needed to check and report them.
+// Compiles a GLSL shader from a source string
+// type: GL_VERTEX_SHADER or GL_FRAGMENT_SHADER
+// Returns shader ID on success, 0 on failure
 // -----------------------------------------------------------------------------
 GLuint compileShader(GLenum type, const std::string& source);
 
 // -----------------------------------------------------------------------------
-// createProgram(vertexPath, fragmentPath)
-// Loads two shader files, compiles them, attaches them to a program,
-// links the program, and returns the resulting pipeline.
-//
-// This is the highest-level helper: the renderer typically calls only this.
-// Example:
-//     GLuint program = createProgram("fullscreen.vert", "fluid.frag");
-//
-// Returns:
-//     - Linked program ID on success
-//     - 0 on failure
+// Creates a shader program from vertex and fragment shader files
+// Steps:
+//   1) Load shader sources from disk
+//   2) Compile shaders
+//   3) Attach and link program
+//   4) Delete individual shaders after linking
+// Returns program ID on success, 0 on failure
 // -----------------------------------------------------------------------------
 GLuint createProgram(const std::string& vertexPath, const std::string& fragmentPath);

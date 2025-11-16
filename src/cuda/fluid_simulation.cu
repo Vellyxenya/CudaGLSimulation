@@ -198,7 +198,7 @@ __global__ void density_to_color_kernel(const float* dens, uchar4* out, int widt
 // ------------------- Heat / FluidSimulation class -------------------
 
 FluidSimulation::FluidSimulation(int width, int height, float dt)
-    : m_width(width), m_height(height), m_dt(dt), m_diffusion(0.0005f), m_viscosity(0.0005f), m_sourceDensity(3.0f)
+    : Simulation(width, height), m_dt(dt), m_diffusion(0.0005f), m_viscosity(0.0005f), m_sourceDensity(3.0f)
 {
     size_t size = (size_t)width * height * sizeof(float);
     // density
@@ -224,22 +224,12 @@ FluidSimulation::FluidSimulation(int width, int height, float dt)
 }
 
 FluidSimulation::~FluidSimulation() {
-    cudaFree(m_devCurrent);
-    cudaFree(m_devNext);
     cudaFree(m_velU);
     cudaFree(m_velV);
     cudaFree(m_velNextU);
     cudaFree(m_velNextV);
     cudaFree(m_pressure);
     cudaFree(m_divergence);
-}
-
-void FluidSimulation::setInitialCondition(const float* hostData) {
-    size_t size = (size_t)m_width * m_height * sizeof(float);
-    if (hostData)
-        cudaMemcpy(m_devCurrent, hostData, size, cudaMemcpyHostToDevice);
-    else
-        cudaMemset(m_devCurrent, 0, size);
 }
 
 void FluidSimulation::injectFromMouse(int x, int y, float2 force, bool addDensity) {

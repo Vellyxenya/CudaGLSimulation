@@ -4,7 +4,6 @@
 #include "gl/renderer.hpp"
 #include "gl/gl_utils.hpp"
 
-// #include <cuda_gl_interop.h>
 #include <iostream>
 
 namespace gl {

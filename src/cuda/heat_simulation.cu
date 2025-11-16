@@ -49,7 +49,7 @@ __global__ void heatToColorKernel(const float* heat, uchar4* buffer, int width, 
 }
 
 HeatSimulation::HeatSimulation(int width, int height, float dt, float diffusion, float sourceHeat)
-    : m_width(width), m_height(height), m_dt(dt), m_diffusion(diffusion), m_sourceHeat(sourceHeat)
+    : Simulation(width, height), m_dt(dt), m_diffusion(diffusion), m_sourceHeat(sourceHeat)
 {
     size_t size = width * height * sizeof(float);
     cudaMalloc(&m_devCurrent, size);
@@ -60,18 +60,7 @@ HeatSimulation::HeatSimulation(int width, int height, float dt, float diffusion,
     cudaMemset(m_devNext, 0, size);
 }
 
-HeatSimulation::~HeatSimulation() {
-    cudaFree(m_devCurrent);
-    cudaFree(m_devNext);
-}
-
-void HeatSimulation::setInitialCondition(const float* hostData) {
-    size_t size = m_width * m_height * sizeof(float);
-    if (hostData)
-        cudaMemcpy(m_devCurrent, hostData, size, cudaMemcpyHostToDevice);
-    else
-        cudaMemset(m_devCurrent, 0, size);
-}
+HeatSimulation::~HeatSimulation() { }
 
 void HeatSimulation::step(uchar4* pbo) {
     dim3 block(16, 16);
