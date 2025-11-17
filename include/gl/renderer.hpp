@@ -81,7 +81,7 @@ private:
     GLuint glProgram;                    // Shader program ID
     GLuint pbo;                          // Pixel Buffer Object (CUDA writes here)
     GLuint tex;                          // Texture used for drawing PBO
-    cudaGraphicsResource* cudaPBO;       // CUDA handle for the PBO
+    cudaGraphicsResource* cudaPBO;       // CUDA resource handle for the PBO
     GLuint vao;                          // Fullscreen quad VAO
 };
 

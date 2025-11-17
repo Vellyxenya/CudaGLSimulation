@@ -21,15 +21,18 @@ void Renderer::initGLResources() {
     // -----------------------------
     // Create Pixel Buffer Object (PBO)
     // -----------------------------
+    // Generate one buffer ID for the PBO
     glGenBuffers(1, &pbo);
+    // Bind the PBO as a pixel unpack buffer. This essentially tells OpenGL that the next operations will act on the `pbo` array
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo);
     // Allocate GPU memory (width*height*RGBA8) without initializing
     glBufferData(GL_PIXEL_UNPACK_BUFFER, width * height * 4 * sizeof(uint8_t), nullptr, GL_DYNAMIC_DRAW);
+    // Unbind the PBO now that we allocated memory for it
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
-
     // -----------------------------
     // Register PBO with CUDA
     // -----------------------------
+    // `cudaGraphicsMapFlagsWriteDiscard` means that CUDA will completely overwrite this buffer’s contents each time it’s mapped
     cudaError_t err = cudaGraphicsGLRegisterBuffer(&cudaPBO, pbo, cudaGraphicsMapFlagsWriteDiscard);
     if (err != cudaSuccess) {
         std::cerr << "cudaGraphicsGLRegisterBuffer failed: "
@@ -91,6 +94,7 @@ void Renderer::draw() {
     glBindTexture(GL_TEXTURE_2D, tex);
     // Updates the texture with the PBO data
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    // Unbind PBO
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 
     // -----------------------------
@@ -100,7 +104,6 @@ void Renderer::draw() {
     glBindVertexArray(vao);
 
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, tex);
 
     // Set sampler uniform (texture unit 0)
     GLint loc = glGetUniformLocation(glProgram, "screenTexture");
