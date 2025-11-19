@@ -27,7 +27,6 @@ extern "C" {
 
 #include "gl/renderer.hpp"         // CUDA-PBO interop renderer
 #include "gl/heat_simulation.hpp"  // Heat diffusion simulation
-#include "gl/fluid_simulation.hpp" // Fluid simulation (Navier–Stokes)
 
 // -----------------------------------------------------------------------------
 // Default window size. These can be overridden using:
@@ -53,7 +52,7 @@ GLFWwindow* initWindow(int width, int height) {
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     // Create window + OpenGL context
-    GLFWwindow* window = glfwCreateWindow(width, height, "CUDA FluidSim", nullptr, nullptr);
+    GLFWwindow* window = glfwCreateWindow(width, height, "CUDA HeatSim", nullptr, nullptr);
     if (!window) {
         std::cerr << "Failed to create GLFW window\n";
         glfwTerminate();
@@ -79,7 +78,7 @@ GLFWwindow* initWindow(int width, int height) {
 
 // -----------------------------------------------------------------------------
 // MAIN
-// Usage: sim.exe [--heat] [--width=<n>] [--height=<n>]
+// Usage: sim.exe [--width=<n>] [--height=<n>]
 // -----------------------------------------------------------------------------
 int main(int argc, char** argv) {
 
@@ -89,16 +88,12 @@ int main(int argc, char** argv) {
     // parsing library such as cxxopts or CLI11 but I am keeping
     // it simple for this demo.
     // ---------------------------------------------------------
-    enum class SimulationType { Fluid, Heat };
-    SimulationType simType = SimulationType::Fluid;
 
     int width  = DEFAULT_WIDTH;
     int height = DEFAULT_HEIGHT;
 
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
-        if (a == "--heat")
-            simType = SimulationType::Heat;
         if (a.rfind("--width=", 0) == 0)
             width = std::stoi(a.substr(8));
         if (a.rfind("--height=", 0) == 0)
@@ -128,19 +123,10 @@ int main(int argc, char** argv) {
     // ---------------------------------------------------------
     // Create simulation object based on CLI flags
     // ---------------------------------------------------------
-    Simulation* simulation = nullptr;
-
-    if (simType == SimulationType::Heat) {
-        const float heatDt        = 0.6f;
-        const float diffusion     = 0.2f;
-        const float sourceHeat    = 5.0f;
-
-        // HeatSimulation(width, height, dt, diffusionConstant, injectedHeatPerClick)
-        simulation = new HeatSimulation(width, height, heatDt, diffusion, sourceHeat);
-    } else {
-        float fluidDt = 0.09f;
-        simulation = new FluidSimulation(width, height, fluidDt);
-    }
+    const float heatDt        = 0.6f;
+    const float diffusion     = 0.2f;
+    const float sourceHeat    = 5.0f;
+    Simulation* simulation = new HeatSimulation(width, height, heatDt, diffusion, sourceHeat);
 
     // ---------------------------------------------------------
     // FPS measurement setup
@@ -171,60 +157,18 @@ int main(int argc, char** argv) {
         uchar4* devPtr = renderer.mapCudaResource();
 
         // ---------------------------------------------------------------------
-        // STEP 2: Mouse interaction (FluidSimulation only)
-        // Adds velocity & dye into the simulation grid based on mouse drag.
-        // ---------------------------------------------------------------------
-        FluidSimulation* fluidSim = dynamic_cast<FluidSimulation*>(simulation);
-        if (fluidSim) {
-            static double prevX = 0.0, prevY = 0.0;
-            double mouseX, mouseY;
-            glfwGetCursorPos(window, &mouseX, &mouseY);
-
-            int leftDown  = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT);
-            int rightDown = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT);
-
-            // Convert screen coordinates → simulation cell coordinates
-            int simX = static_cast<int>(mouseX / width  * fluidSim->width());
-            int simY = static_cast<int>((height - mouseY) / height * fluidSim->height()); // flip Y
-
-            // Calculate mouse velocity (used to inject force)
-            float2 mouseVel = make_float2(
-                static_cast<float>(mouseX - prevX),
-                static_cast<float>(prevY - mouseY) // inverted Y
-            );
-
-            prevX = mouseX;
-            prevY = mouseY;
-
-            // Left mouse = inject velocity + smoke
-            if (leftDown == GLFW_PRESS) {
-                float scale = 0.3f;
-                fluidSim->injectFromMouse(simX, simY,
-                    make_float2(mouseVel.x * scale, mouseVel.y * scale),
-                    true);
-            }
-            // Right mouse = inject opposite velocity (suction)
-            else if (rightDown == GLFW_PRESS) {
-                float scale = 0.3f;
-                fluidSim->injectFromMouse(simX, simY,
-                    make_float2(-mouseVel.x * scale, -mouseVel.y * scale),
-                    false);
-            }
-        }
-
-        // ---------------------------------------------------------------------
-        // STEP 3: Run one simulation step (CUDA kernel inside each sim class)
+        // STEP 2: Run one simulation step (CUDA kernel inside each sim class)
         // Writes directly into devPtr (mapped PBO).
         // ---------------------------------------------------------------------
         simulation->step(devPtr);
 
         // ---------------------------------------------------------------------
-        // STEP 4: Unmap CUDA resource so OpenGL can safely read it again.
+        // STEP 3: Unmap CUDA resource so OpenGL can safely read it again.
         // ---------------------------------------------------------------------
         renderer.unmapCudaResource();
 
         // ---------------------------------------------------------------------
-        // STEP 5: Render the texture updated by CUDA
+        // STEP 4: Render the texture updated by CUDA
         // (PBO → texture upload, then fullscreen quad draw)
         // ---------------------------------------------------------------------
         glClear(GL_COLOR_BUFFER_BIT);
