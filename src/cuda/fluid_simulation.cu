@@ -250,11 +250,17 @@ void jacobiSolve(const float* b, float* x, float* x_temp, float a, float c, int 
     }
 }
 
-// Diffuse velocity using implicit method: solves (u - a*Laplace(u)) = u0
-void diffuseVelocity(float* u, float* u_temp, int width, int height, float visc, float dt) {
-    float a = dt * visc;
+// Generic diffusion using implicit method: solves (field - a*Laplace(field)) = field0
+// Parameters:
+//   field: input/output field to diffuse in-place
+//   temp: temporary buffer for Jacobi iterations
+//   width, height: domain dimensions
+//   diffusionCoeff: diffusion coefficient (viscosity for velocity, diffusion rate for density)
+//   dt: timestep
+void diffuse(float* field, float* temp, int width, int height, float diffusionCoeff, float dt) {
+    float a = dt * diffusionCoeff;
     float c = 1.0f + 4.0f * a;
-    jacobiSolve(u, u_temp, u, a, c, width, height);
+    jacobiSolve(field, temp, field, a, c, width, height);
 }
 
 // Project velocity field to be divergence-free (incompressible)
@@ -308,8 +314,8 @@ void FluidSimulation::step(uchar4* pbo) {
     cudaDeviceSynchronize();
 
     // 2) diffuse velocity
-    diffuseVelocity(m_velU, m_velNextU, m_width, m_height, m_viscosity, m_dt);
-    diffuseVelocity(m_velV, m_velNextV, m_width, m_height, m_viscosity, m_dt);
+    diffuse(m_velU, m_velNextU, m_width, m_height, m_viscosity, m_dt);
+    diffuse(m_velV, m_velNextV, m_width, m_height, m_viscosity, m_dt);
 
     // 3) project to divergence-free
     project(m_velU, m_velV, m_pressure, m_divergence, m_velNextU, m_width, m_height);
@@ -329,18 +335,8 @@ void FluidSimulation::step(uchar4* pbo) {
     injectDensityKernel<<<grid, block>>>(m_devCurrent, m_width, m_height, m_sourceDensity * m_dt, 6.0f);
     cudaDeviceSynchronize();
 
-    // 7) diffuse density (optional)
-    {
-        float a = m_dt * m_diffusion;
-        float c = 1.0f + 4.0f * a;
-        // perform Jacobi iterations: b = dens, x = dens, temp = m_devNext
-        // we reuse m_devNext as temp buffer
-        for (int i = 0; i < ITER; ++i) {
-            jacobiKernel<<<grid, block>>>(m_devCurrent, m_devCurrent, m_devNext, a, c, m_width, m_height);
-            cudaDeviceSynchronize();
-            std::swap(m_devCurrent, m_devNext);
-        }
-    }
+    // 7) diffuse density using the same implicit method as velocity
+    diffuse(m_devCurrent, m_devNext, m_width, m_height, m_diffusion, m_dt);
 
     // 8) advect density
     advectField(m_devCurrent, m_devNext, m_velU, m_velV, m_width, m_height, m_dt);
