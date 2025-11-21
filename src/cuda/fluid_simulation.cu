@@ -10,7 +10,7 @@
 #include <iostream>
 #include <cmath>
 
-static const int ITER = 20; // Jacobi iterations for diffusion / Poisson solves
+static const int ITER = 30; // Jacobi iterations for diffusion / Poisson solves
 
 // ------------------- helpers -------------------
 
@@ -192,7 +192,7 @@ __global__ void densityToColorKernel(const float* input, uchar4* buffer, int wid
 // ------------------- FluidSimulation class -------------------
 
 FluidSimulation::FluidSimulation(int width, int height, float dt)
-    : Simulation(width, height), m_dt(dt), m_diffusion(0.0005f), m_viscosity(0.0005f), m_sourceDensity(3.0f)
+    : Simulation(width, height), m_dt(dt), m_diffusion(0.005f), m_viscosity(0.005f), m_sourceDensity(2.0f)
 {
     size_t size = (size_t)width * height * sizeof(float);
     // Allocate density and velocity grids, pressure, divergence
@@ -263,6 +263,23 @@ void diffuse(float* field, float* temp, int width, int height, float diffusionCo
     jacobiSolve(field, temp, field, a, c, width, height);
 }
 
+// Solve Poisson equation for pressure: Laplacian(p) = divergence
+// Used in projection step to enforce incompressibility
+void solvePressurePoisson(const float* divergence, float* pressure, float* temp, int width, int height) {
+    // Standard Stam coefficients for Poisson solver
+    float a = 1.0f;
+    float c = 4.0f;
+
+    // Jacobi iterations to solve Laplace(p) = divergence
+    for (int i = 0; i < ITER; ++i) {
+        dim3 block(16, 16);
+        dim3 grid((width + block.x - 1) / block.x, (height + block.y - 1) / block.y);
+        jacobiKernel<<<grid, block>>>(divergence, pressure, temp, a, c, width, height);
+        cudaDeviceSynchronize();
+        std::swap(pressure, temp);
+    }
+}
+
 // Project velocity field to be divergence-free (incompressible)
 // 1) compute divergence
 // 2) solve Poisson equation for pressure
@@ -278,19 +295,10 @@ void project(float* u, float* v, float* pressure, float* divergence, float* temp
     // initialize pressure to zero
     cudaMemset(pressure, 0, (size_t)width * height * sizeof(float));
 
-    // solve for pressure (Poisson) using Jacobi: Laplacian(p) = divergence
-    // rewrite as p - a * Laplacian(p) = b with a = 1 and c = 1 + 4*1 = 5 (Jacobi form)
-    // but standard Stam uses a = 1, c = 4
-    float a = 1.0f;
-    float c = 4.0f;
+    // solve for pressure using Poisson solver
+    solvePressurePoisson(divergence, pressure, temp, width, height);
 
-    // Jacobi iterations to solve Laplace(p) = divergence
-    for (int i = 0; i < ITER; ++i) {
-        jacobiKernel<<<grid, block>>>(divergence, pressure, temp, a, c, width, height);
-        cudaDeviceSynchronize();
-        std::swap(pressure, temp);
-    }
-
+    // subtract pressure gradient from velocity
     projectKernel<<<grid, block>>>(u, v, pressure, width, height);
     cudaDeviceSynchronize();
 }
